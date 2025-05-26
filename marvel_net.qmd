@@ -1,6 +1,6 @@
 ---
 title: "Social Network Final Assignment"
-author: "Gür Piren & Gina Tedesco"
+author: "Gina Tedesco & Gür Piren"
 format: pdf
 editor: visual
 ---
@@ -18,6 +18,8 @@ Loading Libraries
 --\> I assume we will need all of these
 
 ```{r}
+#| message: false
+#| warning: false
 set.seed(123)
 library(dplyr)
 library(readr)
@@ -32,9 +34,15 @@ library(RSpectra)
 library(Matrix)
 ```
 
-### Marvel Universe Social Network
+### Marvel Universe social network, 2002
 
---\> In my assignment with Au we recreated the networks just to have them displayed before working on the questions. idk if we want to do that here as well so we can delete this 
+The network shows Marvel characters as well as comic book volumes linked with those characters.
+
+The dataset can be accessed through this [link](https://networks.skewed.de/net/marvel_universe)
+
+**Number of nodes:** 19.428
+
+**Number of edges:** 95.497
 
 ```{r}
 base_path <- "./"
@@ -46,16 +54,28 @@ g_marvel
 
 ```
 
-```{r}
-# Set plot styling
-nc <- "#9370DB" # dark lavender for nodes
-ec <- "grey80"  # light grey for edges
+An important characteristic of our network is that it is bipartite. Meaning that it is made up of different types of nodes. The first 6.486 rows correspond to character nodes, while the remaining rows represent the comic books those characters appear in.
 
-# Set up plotting area (just 1 plot)
+The purple nodes are the Marvel characters and comic books they appear in.
+
+The grey lines represent connections between the two type of nodes, a character appearing in a specific comic book.
+
+The dense central cluster suggests that many characters appear in multiple comics and often coappear with others, creating some sort of a hub/interconnected core.
+
+The sparser nodes likely represent characters or comics with few connections. These are likely to be either minor characters or less known comic issues.
+
+```{r}
+# for the plot styling
+nc <- "#9370DB" 
+ec <- "grey80"
+
+# plotting area
 par(mfrow = c(1,1), mar = c(1,1,2,1))
 
-# Load and plot the Marvel Universe network
+# loading the network
 g <- read_graph("./network.gml", format = "gml")
+
+# plotting the netwrok
 
 plot(
   g,
@@ -70,35 +90,9 @@ plot(
 
 ```
 
-
 ## Questions & Answers
 
-### 1. Find the theoretical epidemic threshold *βc* for your network for the information to reach a significant number of nodes.
-
-@Gür - I was getting this warning message "Warning in asMethod(object) :
-  sparse->dense coercion: allocating vector of size 2.8 GiB" when I ran the below code. Chatgpt explained it's memory intensive so it can crash or freeze R....which was happening to me. I'm leaving it here so you see it in case you start work on this an get a similar code from chatgpt. 
-From Chatgpt "Use RSpectra::eigs() to avoid memory issues
-Replace that line with this efficient and safe alternative:"
-
-DON'T RUN THIS CODE
-
-```{r}
-library(igraph)
-
-# Load your Marvel Universe network
-g_marvel <- read_graph("./network.gml", format = "gml")
-
-# Compute the largest eigenvalue of the adjacency matrix
-lambda_max <- max(eigen(as_adjacency_matrix(g_marvel, sparse = TRUE))$values)
-
-# Compute the epidemic threshold
-beta_c <- 1 / lambda_max
-
-# Print the result
-cat("Theoretical epidemic threshold (βc):", beta_c, "\n")
-
-```
-
+### 1. Find the theoretical epidemic threshold *βc* for your network for the 
 
 
 ```{r}
@@ -121,44 +115,39 @@ cat("Theoretical epidemic threshold (βc):", beta_c, "\n")
 
 ```
 
-
 ### 2. Assuming that randomly-selected 1% initial spreaders, simulate the SIR model below and above that threshold and plot the number of infected people as a function of *β*.
 
-Same warning message as in the previous question
+In the below chunk, we calculate a threshold which helps us determine the point at which an information starts spreading widely in a network instead of dying out. The threshold, in general, tells us how well-spreading an information or contagious a disease needs to be to turn into an epidemic within a network structure.
 
-Here I just replaced the code so you can run this one. 
+We set simulation parameters to control the conditions of the experiment and observe how the spreading behaves under different scenarios. This helps us understand the network’s response to varying spreading rates and how close we are to the critical threshold where information starts to travel way more. So, we create a range of 10 different spreading rates (β values), starting from well below the threshold (0.2 times the βc) up to twice the threshold.
+
+The plot shows that when β (information spreading rate) is below around 0.015, the theoretical threshold we acquired prior to plotting, very few people get the word. But once β goes above that threshold, the total number of informed individuals rises sharply, crossing 1.000, and continuing to grow. This means the gossip only spreads widely if β is high enough.
 
 ```{r}
-# Load required libraries
-library(igraph)
-library(dplyr)
-library(Matrix)
-library(RSpectra)
 
-# Load the Marvel Universe graph
 g <- read_graph("./network.gml", format = "gml")
 N <- vcount(g)
 
-# Step 1: Compute βc using RSpectra to avoid dense matrix conversion
+# compute a threshold 
 A <- as_adjacency_matrix(g, sparse = TRUE)
 lambda_max <- eigs(A, k = 1, which = "LM")$values
 beta_c <- 1 / lambda_max
 
 cat("Theoretical epidemic threshold (βc):", beta_c, "\n")
 
-# Step 2: Simulation parameters
-gamma <- 1     # Recovery rate (μ)
-beta_values <- seq(0.2 * beta_c, 2 * beta_c, length.out = 10)  # Range of β values
-initial_frac <- 0.01  # 1% seed nodes
-T_max <- 20           # Max time steps
+# parameters
+gamma <- 1     # recovery rate 
+beta_values <- seq(0.2 * beta_c, 2 * beta_c, length.out = 10)  # the range for threshold values
+initial_frac <- 0.01  # 1% seed nodes as asked. means that %1 will get infected
+T_max <- 20           # for the duration of the simulation
 
-# Step 3: SIR simulation function
+# SIR simulation function
 simulate_SIR <- function(g, beta, gamma, initial_frac, T_max) {
   N <- vcount(g)
   state <- rep("S", N)
   names(state) <- V(g)$name
   
-  # Randomly infect initial nodes
+  # to randomly infect initial nodes
   initial_infected <- sample(V(g), size = ceiling(initial_frac * N))
   state[initial_infected] <- "I"
   
@@ -187,14 +176,15 @@ simulate_SIR <- function(g, beta, gamma, initial_frac, T_max) {
   return(total_infected)
 }
 
-# Step 4: Run simulations across β values
+# running the simulations across different β values
 set.seed(42)
 results <- data.frame(
   beta = beta_values,
   infected = sapply(beta_values, function(b) simulate_SIR(g, b, gamma, initial_frac, T_max))
 )
 
-# Step 5: Plot results
+# plot 
+
 plot(
   results$beta,
   results$infected,
@@ -214,30 +204,25 @@ legend("bottomright", legend = c("βc threshold"), col = "blue", lty = 2)
 
 #### a) The difference in the total number of infected people
 
+The infection rate we used is twice the threshold we acquired earlier, meaning a large outbreak is VERY likely. When starting with random nodes, about 1.527 characters got infected. However, when starting with the most connected characters, 1.760 got infected, and as expected, showing that targeting central nodes spreads the infection more effectively.
+
+
 ```{r}
-# Load required libraries
-library(igraph)
-library(Matrix)
-library(RSpectra)
 
-# Load the Marvel Universe network
-g <- read_graph("./network.gml", format = "gml")
-N <- vcount(g)
-
-# Step 1: Compute βc using RSpectra (safe for large sparse matrices)
+# computing βc again
 A <- as_adjacency_matrix(g, sparse = TRUE)
 lambda_max <- eigs(A, k = 1, which = "LM")$values
 beta_c <- 1 / lambda_max
-beta <- 2 * beta_c  # Well above threshold
-gamma <- 1          # Recovery rate
-T_max <- 20         # Max time steps
+beta <- 2 * beta_c  # two times the threshold, as requested in assignment
+gamma <- 1          # recovery rate
+T_max <- 20         # duration of the simulation
 initial_frac <- 0.01
 seed_count <- ceiling(N * initial_frac)
 
 cat("Theoretical epidemic threshold (βc):", beta_c, "\n")
 cat("Simulating with β =", beta, "\n\n")
 
-# Step 2: SIR simulation function with custom seed set
+# SIR simulation function with custom seed set
 simulate_SIR_with_seeds <- function(g, beta, gamma, T_max, seeds) {
   N <- vcount(g)
   state <- rep("S", N)
@@ -259,19 +244,19 @@ simulate_SIR_with_seeds <- function(g, beta, gamma, T_max, seeds) {
     state <- new_state
   }
   
-  return(sum(state == "R"))  # Total infected = number of recovered nodes
+  return(sum(state == "R"))  # total infected = number of recovered nodes
 }
 
-# Step 3a: Random seeding strategy
+# random seeding
 set.seed(123)
 random_seeds <- sample(V(g), seed_count)
 infected_random <- simulate_SIR_with_seeds(g, beta, gamma, T_max, random_seeds)
 
-# Step 3b: Degree centrality-based seeding strategy
+# degree centrality-based seeding 
 top_degree_nodes <- order(degree(g), decreasing = TRUE)[1:seed_count]
 infected_centrality <- simulate_SIR_with_seeds(g, beta, gamma, T_max, top_degree_nodes)
 
-# Step 4: Report results
+# results
 cat("Total infected (random seeding):     ", infected_random, "\n")
 cat("Total infected (centrality seeding): ", infected_centrality, "\n")
 cat("Difference (centrality - random):    ", infected_centrality - infected_random, "\n")
@@ -280,6 +265,9 @@ cat("Difference (centrality - random):    ", infected_centrality - infected_rand
 ```
 
 #### b) The difference in the time of the peak of infection (when most infections happen).
+
+Here we try to simulate the process and track how many characters are informed at each time step. The results will return both the total number of characters who got the information and the time step when spreading peaked.
+
 
 ```{r}
 simulate_SIR_with_peak <- function(g, beta, gamma, T_max, seeds) {
@@ -317,26 +305,29 @@ simulate_SIR_with_peak <- function(g, beta, gamma, T_max, seeds) {
 
 ```
 
-#### Run Simulation 
+#### Run Simulation
+
+The results shows that when spreading of information started randomly, the peak occurred at time step 7. When it started from central nodes, the peak occurred at time step 2. This means that spreading occurs much faster when it began with highly connected individuals.
+
 ```{r}
-# Random seeding
 set.seed(123)
 random_seeds <- sample(V(g), seed_count)
 res_random <- simulate_SIR_with_peak(g, beta, gamma, T_max, random_seeds)
 
-# Centrality seeding
+# using centrality for seeding
 top_degree_nodes <- order(degree(g), decreasing = TRUE)[1:seed_count]
 res_centrality <- simulate_SIR_with_peak(g, beta, gamma, T_max, top_degree_nodes)
 
-# Output comparison
+# comparison
 cat("Peak time (random seeding):     ", res_random$peak, "\n")
 cat("Peak time (centrality seeding): ", res_centrality$peak, "\n")
 cat("Difference in peak time:        ", res_centrality$peak - res_random$peak, "\n")
 
 ```
 
-
 ### 4. Using the same *β*, design a “quarantine strategy”: at time step *t* = 3 or 4 , quarantine 20% of the susceptible population. You can model quarantine by temporally removing these nodes. Release the quarantined nodes time steps later, making them susceptible again. Measure the difference with respect to no quarantine.
+
+As asked, we define a function that simulates the spread of an epidemic while introducing a quarantine. At a chosen time step (we pick 3), it temporarily removes 20% of the healthy population by marking them as quarantined so they can’t get infected. After a delay of 3 steps, we put them back into the simulation as susceptible nodes again. We track how the infection spreads and returns the total number infected and the time the infection peaked.
 
 ```{r}
 simulate_SIR_with_quarantine <- function(g, beta, gamma, T_max, seeds,
@@ -352,15 +343,15 @@ simulate_SIR_with_quarantine <- function(g, beta, gamma, T_max, seeds,
   for (t in 1:T_max) {
     infected_count[t] <- sum(state == "I")
     
-    # Quarantine starts
+    # let's start the quarantine 
     if (t == quarantine_time) {
       sus_ids <- which(state == "S")
       quarantine_nodes <- sample(sus_ids, size = ceiling(quarantine_frac * length(sus_ids)))
-      state[quarantine_nodes] <- "Q"  # Quarantined (not infectable)
+      state[quarantine_nodes] <- "Q"  # quarantined 
       quarantine_active <- TRUE
     }
     
-    # Quarantine ends
+    # ending the quarantine 
     if (t == quarantine_time + release_delay && quarantine_active) {
       state[quarantine_nodes] <- "S"
       quarantine_active <- FALSE
@@ -392,25 +383,27 @@ simulate_SIR_with_quarantine <- function(g, beta, gamma, T_max, seeds,
   return(list(total = total_infected, peak = peak_time))
 }
 
-
 ```
 
+#### Run it with and wihtout quarantine
 
-#### Run it with and wihtout quarantine 
+In below chunk, we run two simulations of the epidemic using the same initial infected nodes. The first simulation has no quarantine (quarantine starts very late and affects nobody). The second applies quarantine at time step 3, removing 20% of healthy nodes for 3 steps. We then compare the total number of people infected in each case.
+
+The results show that without quarantine, 1.601 got infected, while with quarantine, only 1.211 got infected. This means a reduction of 390 cases, indicating that quarantining part of the population early slowed the spread and lowered total infections.
+
 ```{r}
-# Parameters
 set.seed(42)
 random_seeds <- sample(V(g), seed_count)
 
-# No quarantine
+# no quarantine - simulation
 res_no_q <- simulate_SIR_with_quarantine(g, beta, gamma, T_max, random_seeds,
                                          quarantine_time = 100, release_delay = 0, quarantine_frac = 0)
 
-# With quarantine starting at t = 3, 20% quarantined, released after 3 steps
+# scenario with quarantine starting at t = 3, 20% quarantined, released after 3 steps
 res_q <- simulate_SIR_with_quarantine(g, beta, gamma, T_max, random_seeds,
                                       quarantine_time = 3, release_delay = 3, quarantine_frac = 0.20)
 
-# Output results
+# results
 cat("Total infected (no quarantine):    ", res_no_q$total, "\n")
 cat("Total infected (with quarantine): ", res_q$total, "\n")
 cat("Difference in infections:         ", res_q$total - res_no_q$total, "\n")
@@ -419,22 +412,25 @@ cat("Difference in infections:         ", res_q$total - res_no_q$total, "\n")
 
 ### 5. Suppose now that you can convince 5% of people in the network not to spread that information at all.
 
+
 #### - Choose those 5% randomly in the network. Simulate the SIR model above βc using 1% of the remaining nodes as seeds. Choose those seeds randomly.
+
+Here we randomly select 5% of nodes as non-spreaders who can get infected but won’t infect others either. The function then seeds the infection only among the remaining spreaders and runs the SIR simulation accordingly. The result tracks total infections and peak infection time, showing how having non-spreaders mightt affect the epidemic.
 
 ```{r}
 simulate_SIR_with_nonspreaders <- function(g, beta, gamma, T_max, nonspreaders_frac = 0.05, seed_frac = 0.01) {
   N <- vcount(g)
   nodes <- V(g)
   
-  # Step 1: Pick non-spreaders randomly
+  # picking non-spreaders randomly
   nonspreaders <- sample(nodes, size = ceiling(nonspreaders_frac * N))
   spreaders <- setdiff(nodes, nonspreaders)
   
-  # Step 2: Pick 1% of spreaders as seeds
+  # picking 1% of spreaders as seeds
   seed_count <- ceiling(seed_frac * length(spreaders))
   seeds <- sample(spreaders, seed_count)
   
-  # Step 3: Initialize SIR states
+  # initializing SIR states
   state <- rep("S", N)
   state[seeds] <- "I"
   
@@ -445,7 +441,7 @@ simulate_SIR_with_nonspreaders <- function(g, beta, gamma, T_max, nonspreaders_f
     new_state <- state
     
     for (i in which(state == "I")) {
-      # Only spread if not in the non-spreader group
+      # only spread if not in the non-spreader group
       if (!(i %in% nonspreaders)) {
         for (n in neighbors(g, i)) {
           if (state[n] == "S" && runif(1) < beta) {
@@ -453,7 +449,7 @@ simulate_SIR_with_nonspreaders <- function(g, beta, gamma, T_max, nonspreaders_f
           }
         }
       }
-      # Recovery
+      # recovery
       if (runif(1) < gamma) {
         new_state[i] <- "R"
       }
@@ -476,6 +472,13 @@ simulate_SIR_with_nonspreaders <- function(g, beta, gamma, T_max, nonspreaders_f
 ```
 
 #### Run the simulation
+
+The result shows that with 5% non-spreaders, a total of 1.428 nodes got infected during the epidemic. The peak time was 7, meaning the highest number of infections happened at time step 7. This indicates that having non-spreaders slowed the spread compared to no intervention, but the timing of the epidemic’s peak stayed the same.
+
+These results also have interesting implications compared to the quarantine scenario we practiced earlier. The fact that convincing 5% not to spread the news reduces infections more than no quarantine scenario, but less than quarantining 20% of the network suggests that larger, temporary removal (quarantine) is more effective at slowing the spread than a smaller fraction permanently refusing to spread. 
+
+It implies that quarantining a bigger group (or isolating in the information-spreading case), even temporarily, can have a stronger impact than a smaller group who never spreads. This highligts the importance of the proportion and timing of interventions in controlling epidemics.
+
 ```{r}
 set.seed(42)
 res_random_blockers <- simulate_SIR_with_nonspreaders(g, beta, gamma, T_max)
@@ -485,8 +488,9 @@ cat("Peak time:                                ", res_random_blockers$peak, "\n"
 
 ```
 
-
 #### - Choose those 5% according to their centrality. Simulate the SIR model above βc using 1% of the remaining nodes as seeds. Choose those seeds randomly.
+
+Next, we select the top 5% of nodes by centrality as non-spreaders who cannot transmit the information The function randomly picks 1% of the remaining nodes as seeds to start the spreading The SIR simulation runs with these settings, tracking total infected and peak infection time.
 
 ```{r}
 simulate_SIR_with_nonspreaders_central <- function(g, beta, gamma, T_max,
@@ -496,17 +500,17 @@ simulate_SIR_with_nonspreaders_central <- function(g, beta, gamma, T_max,
   N <- vcount(g)
   nodes <- V(g)
   
-  # Step 1: Choose top 5% by centrality as non-spreaders
+  # choosing top 5% by centrality as non-spreaders
   centrality_scores <- centrality_func(g)
   top_ids <- order(centrality_scores, decreasing = TRUE)[1:ceiling(nonspreaders_frac * N)]
   nonspreaders <- nodes[top_ids]
   spreaders <- setdiff(nodes, nonspreaders)
   
-  # Step 2: Randomly select 1% of spreaders as seeds
+  # randomly selecting 1% of spreaders as seeds
   seed_count <- ceiling(seed_frac * length(spreaders))
   seeds <- sample(spreaders, seed_count)
   
-  # Step 3: Initialize SIR states
+  # initializig SIR states
   state <- rep("S", N)
   state[seeds] <- "I"
   
@@ -545,8 +549,12 @@ simulate_SIR_with_nonspreaders_central <- function(g, beta, gamma, T_max,
 
 ```
 
-
 #### Run the simulation with degree centrality
+
+We finally run the SIR simulation where the top 5% most connected nodes are non-spreaders as explained earlier, so they don’t transmit infection. The infection starts from 1% of the other nodes.
+
+The result shows a very low total infected count (221) and an early peak at time 1, meaning blocking highly connected nodes drastically limits the spread and the spreading peaks almost immediately with few infections. This has good implications for epidemics!
+
 ```{r}
 set.seed(42)
 res_central_blockers <- simulate_SIR_with_nonspreaders_central(g, beta, gamma, T_max)
@@ -557,6 +565,11 @@ cat("Peak time:                                    ", res_central_blockers$peak,
 ```
 
 #### - Measure the difference between both cases as you did in step 3.
+
+The negative difference in total infected (-1207) means that choosing the top 5% by centrality as non-spreaders greatly reduced infections compared to random non-spreaders.
+
+The peak time difference of -6 shows the epidemic peaked 6 time steps earlier with centrality-based blockers, indicating the outbreak was much shorter and more contained.
+
 
 ```{r}
 diff_total_infected <- res_central_blockers$total - res_random_blockers$total
@@ -569,12 +582,22 @@ cat("Difference in peak time (centrality - random):", diff_peak_time, "\n")
 
 ### 6. Comment on the relationship between the findings in steps 3 and 5 using the same type of centrality for the 1% in step 3 and 5% in step 5.
 
-No code required just words
+The findings show that targeting the most central nodes both for initial infection seeds and for blocking spreaders has a big impact on the epidemic. In the former, seeding infection in top central nodes caused an earlier and sharper peak, while in in the latter, blocking those same central nodes greatly reduced total infections and shortened the outbreak. This highlights, expectedly, how central nodes play a crucial role in spreading, so focusing interventions on them can either speed up or effectively slow down an epidemic.
 
 ### 7. With the results of step 2, train a model that predicts that time to infection of a node using their degree, centrality, betweeness, page rank and any other predictors you see fit. Use that model to select the seed nodes as those with the smallest time to infection in step 3. Repeat step 5 with this knowledge.
 
+
+
+The below model attempts to predict each node's time to infection using degree, betweenness, PageRank, and eigenvector centrality. However, it performs poorly. The R-squared is only 0.0048, meaning the model explains less than 0.5% of the variation in infection time. The overall p-value from the F-test is 0.10, suggesting the model is not statistically significant.
+
+Looking at the individual predictors, none of them are significant at the desired level. Only eigenvector centrality is significant, compared to other methods, with a p-value of 0.0586, indicating a weak negative relationship with time to infection. 
+
+The other variables—degree, betweenness, and PageRank—show no meaningful predictive power. This suggests that these centrality features alone are not strong predictors of when a node will get infected in the simulation.
+
+
 ```{r}
-# Compute node features
+
+# computing node features
 features_df <- data.frame(
   node = V(g)$name,
   degree = degree(g),
@@ -583,8 +606,8 @@ features_df <- data.frame(
   eigen = eigen_centrality(g)$vector
 )
 
-# From Step 2: capture infection times
-# Update the simulation function from earlier to store per-node infection time:
+# capture infection times from step 2
+# update the simulation function from earlier to store per-node infection time. necessaryt
 
 simulate_SIR_with_infection_time <- function(g, beta, gamma, T_max, seeds) {
   N <- vcount(g)
@@ -613,32 +636,33 @@ simulate_SIR_with_infection_time <- function(g, beta, gamma, T_max, seeds) {
   return(infection_time)
 }
 
-# Simulate and train model
+# let's simulate and train model
 set.seed(42)
 seed_count <- ceiling(0.01 * vcount(g))
 seeds <- sample(V(g), seed_count)
 inf_time <- simulate_SIR_with_infection_time(g, beta, gamma, T_max, seeds)
 
-# Add target variable to features
+# adding target variable to features
 features_df$inf_time <- inf_time
 df_model <- na.omit(features_df)  # drop nodes never infected
 
-# Train model
+# training model
 model <- lm(inf_time ~ degree + betweenness + pagerank + eigen, data = df_model)
 summary(model)
 
-# Predict infection time for all nodes
+# predicting infection time for all nodes
 features_df$predicted_time <- predict(model, newdata = features_df)
 
-# Use predicted time:
+# use predicted time:
+
 # Step 3 redo: top 1% with smallest predicted infection time as seeds
 
 # Step 5 redo: top 5% with smallest predicted infection time as blockers
 
-# Seeding set:
+# seeding set
 seeding_nodes <- V(g)[order(features_df$predicted_time)][1:seed_count]
 
-# Blocking set:
+# blocking set:
 block_count <- ceiling(0.05 * vcount(g))
 blocking_nodes <- V(g)[order(features_df$predicted_time)][1:block_count]
 
@@ -646,6 +670,16 @@ blocking_nodes <- V(g)[order(features_df$predicted_time)][1:block_count]
 
 ## Conclusion
 
-some words about the conclusion
+Our analysis explored how targeted interventions based on network centrality affect the spread of an epidemic using the SIR model. We found that blocking the top 5% most central nodes by degree significantly reduced total infections and delayed the peak compared to blocking nodes at random, highlighting the importance of network structure in containment strategies.
+
+When comparing centrality-based seed selection to random seeding, we observed that targeting highly central nodes as initial spreaders led to faster and broader epidemics. 
+
+Attempts to predict time to infection using centrality measures showed limited success, as our linear model explained little variance, suggesting that infection dynamics are influenced by more than just static node features. 
+
+Overall, our results show that network-informed strategies can be effective for both slowing and accelerating epidemics or spreading, but predicting exact infection timings remains a challenge for the scope of this assignmet.
+
 
 ## References
+
+
+
