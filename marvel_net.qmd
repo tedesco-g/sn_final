@@ -1,0 +1,651 @@
+---
+title: "Social Network Final Assignment"
+author: "Gür Piren & Gina Tedesco"
+format: pdf
+editor: visual
+---
+
+## Introduction
+
+Some introduction words
+
+## Dataset Handling
+
+### Libraries and Explore the Dataset
+
+Loading Libraries
+
+--\> I assume we will need all of these
+
+```{r}
+set.seed(123)
+library(dplyr)
+library(readr)
+library(igraph)
+library(RColorBrewer)
+library(tinytex)
+library(ggplot2)
+library(knitr)
+library(boot)
+library(linkprediction)
+library(RSpectra)
+library(Matrix)
+```
+
+### Marvel Universe Social Network
+
+--\> In my assignment with Au we recreated the networks just to have them displayed before working on the questions. idk if we want to do that here as well so we can delete this 
+
+```{r}
+base_path <- "./"
+
+
+g_marvel <- read_graph(paste0(base_path, "network.gml"), format = "gml")
+
+g_marvel
+
+```
+
+```{r}
+# Set plot styling
+nc <- "#9370DB" # dark lavender for nodes
+ec <- "grey80"  # light grey for edges
+
+# Set up plotting area (just 1 plot)
+par(mfrow = c(1,1), mar = c(1,1,2,1))
+
+# Load and plot the Marvel Universe network
+g <- read_graph("./network.gml", format = "gml")
+
+plot(
+  g,
+  main = "Marvel Universe Network",
+  vertex.size = 3,
+  vertex.label = NA,
+  vertex.color = nc,
+  vertex.frame.color = "white",
+  edge.color = ec,
+  edge.arrow.size = 0
+)
+
+```
+
+
+## Questions & Answers
+
+### 1. Find the theoretical epidemic threshold *βc* for your network for the information to reach a significant number of nodes.
+
+@Gür - I was getting this warning message "Warning in asMethod(object) :
+  sparse->dense coercion: allocating vector of size 2.8 GiB" when I ran the below code. Chatgpt explained it's memory intensive so it can crash or freeze R....which was happening to me. I'm leaving it here so you see it in case you start work on this an get a similar code from chatgpt. 
+From Chatgpt "Use RSpectra::eigs() to avoid memory issues
+Replace that line with this efficient and safe alternative:"
+
+DON'T RUN THIS CODE
+
+```{r}
+library(igraph)
+
+# Load your Marvel Universe network
+g_marvel <- read_graph("./network.gml", format = "gml")
+
+# Compute the largest eigenvalue of the adjacency matrix
+lambda_max <- max(eigen(as_adjacency_matrix(g_marvel, sparse = TRUE))$values)
+
+# Compute the epidemic threshold
+beta_c <- 1 / lambda_max
+
+# Print the result
+cat("Theoretical epidemic threshold (βc):", beta_c, "\n")
+
+```
+
+
+
+```{r}
+library(igraph)
+library(Matrix)
+library(RSpectra)
+
+# Load the graph
+g_marvel <- read_graph("./network.gml", format = "gml")
+
+# Compute the largest eigenvalue of the adjacency matrix efficiently
+A <- as_adjacency_matrix(g_marvel, sparse = TRUE)
+lambda_max <- eigs(A, k = 1, which = "LM")$values
+
+# Compute the epidemic threshold
+beta_c <- 1 / lambda_max
+
+# Output
+cat("Theoretical epidemic threshold (βc):", beta_c, "\n")
+
+```
+
+
+### 2. Assuming that randomly-selected 1% initial spreaders, simulate the SIR model below and above that threshold and plot the number of infected people as a function of *β*.
+
+Same warning message as in the previous question
+
+Here I just replaced the code so you can run this one. 
+
+```{r}
+# Load required libraries
+library(igraph)
+library(dplyr)
+library(Matrix)
+library(RSpectra)
+
+# Load the Marvel Universe graph
+g <- read_graph("./network.gml", format = "gml")
+N <- vcount(g)
+
+# Step 1: Compute βc using RSpectra to avoid dense matrix conversion
+A <- as_adjacency_matrix(g, sparse = TRUE)
+lambda_max <- eigs(A, k = 1, which = "LM")$values
+beta_c <- 1 / lambda_max
+
+cat("Theoretical epidemic threshold (βc):", beta_c, "\n")
+
+# Step 2: Simulation parameters
+gamma <- 1     # Recovery rate (μ)
+beta_values <- seq(0.2 * beta_c, 2 * beta_c, length.out = 10)  # Range of β values
+initial_frac <- 0.01  # 1% seed nodes
+T_max <- 20           # Max time steps
+
+# Step 3: SIR simulation function
+simulate_SIR <- function(g, beta, gamma, initial_frac, T_max) {
+  N <- vcount(g)
+  state <- rep("S", N)
+  names(state) <- V(g)$name
+  
+  # Randomly infect initial nodes
+  initial_infected <- sample(V(g), size = ceiling(initial_frac * N))
+  state[initial_infected] <- "I"
+  
+  infected_count <- numeric(T_max)
+  
+  for (t in 1:T_max) {
+    infected_count[t] <- sum(state == "I")
+    new_state <- state
+    
+    for (i in which(state == "I")) {
+      neighbors <- neighbors(g, i)
+      for (n in neighbors) {
+        if (state[n] == "S" && runif(1) < beta) {
+          new_state[n] <- "I"
+        }
+      }
+      if (runif(1) < gamma) {
+        new_state[i] <- "R"
+      }
+    }
+    
+    state <- new_state
+  }
+  
+  total_infected <- sum(state == "R")
+  return(total_infected)
+}
+
+# Step 4: Run simulations across β values
+set.seed(42)
+results <- data.frame(
+  beta = beta_values,
+  infected = sapply(beta_values, function(b) simulate_SIR(g, b, gamma, initial_frac, T_max))
+)
+
+# Step 5: Plot results
+plot(
+  results$beta,
+  results$infected,
+  type = "b",
+  col = "darkred",
+  pch = 16,
+  xlab = expression(beta),
+  ylab = "Total Infected",
+  main = "Total Infected vs β (SIR Simulation)"
+)
+abline(v = beta_c, col = "blue", lty = 2)
+legend("bottomright", legend = c("βc threshold"), col = "blue", lty = 2)
+
+```
+
+### 3. Choose a *β* well-above above *βc*. Using centrality, communities or any other suitable metric, find a better set of 1% of seeds in the network so we get more infected people than the random case. Measure the difference of your choice with the random case as:
+
+#### a) The difference in the total number of infected people
+
+```{r}
+# Load required libraries
+library(igraph)
+library(Matrix)
+library(RSpectra)
+
+# Load the Marvel Universe network
+g <- read_graph("./network.gml", format = "gml")
+N <- vcount(g)
+
+# Step 1: Compute βc using RSpectra (safe for large sparse matrices)
+A <- as_adjacency_matrix(g, sparse = TRUE)
+lambda_max <- eigs(A, k = 1, which = "LM")$values
+beta_c <- 1 / lambda_max
+beta <- 2 * beta_c  # Well above threshold
+gamma <- 1          # Recovery rate
+T_max <- 20         # Max time steps
+initial_frac <- 0.01
+seed_count <- ceiling(N * initial_frac)
+
+cat("Theoretical epidemic threshold (βc):", beta_c, "\n")
+cat("Simulating with β =", beta, "\n\n")
+
+# Step 2: SIR simulation function with custom seed set
+simulate_SIR_with_seeds <- function(g, beta, gamma, T_max, seeds) {
+  N <- vcount(g)
+  state <- rep("S", N)
+  state[seeds] <- "I"
+  
+  for (t in 1:T_max) {
+    new_state <- state
+    for (i in which(state == "I")) {
+      for (n in neighbors(g, i)) {
+        if (state[n] == "S" && runif(1) < beta) {
+          new_state[n] <- "I"
+        }
+      }
+      if (runif(1) < gamma) {
+        new_state[i] <- "R"
+      }
+    }
+    if (sum(new_state == "I") == 0) break
+    state <- new_state
+  }
+  
+  return(sum(state == "R"))  # Total infected = number of recovered nodes
+}
+
+# Step 3a: Random seeding strategy
+set.seed(123)
+random_seeds <- sample(V(g), seed_count)
+infected_random <- simulate_SIR_with_seeds(g, beta, gamma, T_max, random_seeds)
+
+# Step 3b: Degree centrality-based seeding strategy
+top_degree_nodes <- order(degree(g), decreasing = TRUE)[1:seed_count]
+infected_centrality <- simulate_SIR_with_seeds(g, beta, gamma, T_max, top_degree_nodes)
+
+# Step 4: Report results
+cat("Total infected (random seeding):     ", infected_random, "\n")
+cat("Total infected (centrality seeding): ", infected_centrality, "\n")
+cat("Difference (centrality - random):    ", infected_centrality - infected_random, "\n")
+
+
+```
+
+#### b) The difference in the time of the peak of infection (when most infections happen).
+
+```{r}
+simulate_SIR_with_peak <- function(g, beta, gamma, T_max, seeds) {
+  N <- vcount(g)
+  state <- rep("S", N)
+  state[seeds] <- "I"
+  
+  infected_count <- numeric(T_max)
+  
+  for (t in 1:T_max) {
+    infected_count[t] <- sum(state == "I")
+    
+    new_state <- state
+    for (i in which(state == "I")) {
+      for (n in neighbors(g, i)) {
+        if (state[n] == "S" && runif(1) < beta) {
+          new_state[n] <- "I"
+        }
+      }
+      if (runif(1) < gamma) {
+        new_state[i] <- "R"
+      }
+    }
+    if (sum(new_state == "I") == 0) {
+      infected_count[(t+1):T_max] <- 0
+      break
+    }
+    state <- new_state
+  }
+  
+  total_infected <- sum(state == "R")
+  peak_time <- which.max(infected_count)
+  return(list(total = total_infected, peak = peak_time))
+}
+
+```
+
+#### Run Simulation 
+```{r}
+# Random seeding
+set.seed(123)
+random_seeds <- sample(V(g), seed_count)
+res_random <- simulate_SIR_with_peak(g, beta, gamma, T_max, random_seeds)
+
+# Centrality seeding
+top_degree_nodes <- order(degree(g), decreasing = TRUE)[1:seed_count]
+res_centrality <- simulate_SIR_with_peak(g, beta, gamma, T_max, top_degree_nodes)
+
+# Output comparison
+cat("Peak time (random seeding):     ", res_random$peak, "\n")
+cat("Peak time (centrality seeding): ", res_centrality$peak, "\n")
+cat("Difference in peak time:        ", res_centrality$peak - res_random$peak, "\n")
+
+```
+
+
+### 4. Using the same *β*, design a “quarantine strategy”: at time step *t* = 3 or 4 , quarantine 20% of the susceptible population. You can model quarantine by temporally removing these nodes. Release the quarantined nodes time steps later, making them susceptible again. Measure the difference with respect to no quarantine.
+
+```{r}
+simulate_SIR_with_quarantine <- function(g, beta, gamma, T_max, seeds,
+                                         quarantine_time = 3, release_delay = 3, quarantine_frac = 0.20) {
+  N <- vcount(g)
+  state <- rep("S", N)
+  state[seeds] <- "I"
+  
+  infected_count <- numeric(T_max)
+  quarantine_active <- FALSE
+  quarantine_nodes <- c()
+  
+  for (t in 1:T_max) {
+    infected_count[t] <- sum(state == "I")
+    
+    # Quarantine starts
+    if (t == quarantine_time) {
+      sus_ids <- which(state == "S")
+      quarantine_nodes <- sample(sus_ids, size = ceiling(quarantine_frac * length(sus_ids)))
+      state[quarantine_nodes] <- "Q"  # Quarantined (not infectable)
+      quarantine_active <- TRUE
+    }
+    
+    # Quarantine ends
+    if (t == quarantine_time + release_delay && quarantine_active) {
+      state[quarantine_nodes] <- "S"
+      quarantine_active <- FALSE
+    }
+    
+    new_state <- state
+    for (i in which(state == "I")) {
+      for (n in neighbors(g, i)) {
+        if (state[n] == "S" && runif(1) < beta) {
+          new_state[n] <- "I"
+        }
+      }
+      if (runif(1) < gamma) {
+        new_state[i] <- "R"
+      }
+    }
+    
+    if (sum(new_state == "I") == 0) {
+      infected_count[(t+1):T_max] <- 0
+      break
+    }
+    
+    state <- new_state
+  }
+  
+  total_infected <- sum(state == "R")
+  peak_time <- which.max(infected_count)
+  
+  return(list(total = total_infected, peak = peak_time))
+}
+
+
+```
+
+
+#### Run it with and wihtout quarantine 
+```{r}
+# Parameters
+set.seed(42)
+random_seeds <- sample(V(g), seed_count)
+
+# No quarantine
+res_no_q <- simulate_SIR_with_quarantine(g, beta, gamma, T_max, random_seeds,
+                                         quarantine_time = 100, release_delay = 0, quarantine_frac = 0)
+
+# With quarantine starting at t = 3, 20% quarantined, released after 3 steps
+res_q <- simulate_SIR_with_quarantine(g, beta, gamma, T_max, random_seeds,
+                                      quarantine_time = 3, release_delay = 3, quarantine_frac = 0.20)
+
+# Output results
+cat("Total infected (no quarantine):    ", res_no_q$total, "\n")
+cat("Total infected (with quarantine): ", res_q$total, "\n")
+cat("Difference in infections:         ", res_q$total - res_no_q$total, "\n")
+
+```
+
+### 5. Suppose now that you can convince 5% of people in the network not to spread that information at all.
+
+#### - Choose those 5% randomly in the network. Simulate the SIR model above βc using 1% of the remaining nodes as seeds. Choose those seeds randomly.
+
+```{r}
+simulate_SIR_with_nonspreaders <- function(g, beta, gamma, T_max, nonspreaders_frac = 0.05, seed_frac = 0.01) {
+  N <- vcount(g)
+  nodes <- V(g)
+  
+  # Step 1: Pick non-spreaders randomly
+  nonspreaders <- sample(nodes, size = ceiling(nonspreaders_frac * N))
+  spreaders <- setdiff(nodes, nonspreaders)
+  
+  # Step 2: Pick 1% of spreaders as seeds
+  seed_count <- ceiling(seed_frac * length(spreaders))
+  seeds <- sample(spreaders, seed_count)
+  
+  # Step 3: Initialize SIR states
+  state <- rep("S", N)
+  state[seeds] <- "I"
+  
+  infected_count <- numeric(T_max)
+  
+  for (t in 1:T_max) {
+    infected_count[t] <- sum(state == "I")
+    new_state <- state
+    
+    for (i in which(state == "I")) {
+      # Only spread if not in the non-spreader group
+      if (!(i %in% nonspreaders)) {
+        for (n in neighbors(g, i)) {
+          if (state[n] == "S" && runif(1) < beta) {
+            new_state[n] <- "I"
+          }
+        }
+      }
+      # Recovery
+      if (runif(1) < gamma) {
+        new_state[i] <- "R"
+      }
+    }
+    
+    if (sum(new_state == "I") == 0) {
+      infected_count[(t+1):T_max] <- 0
+      break
+    }
+    
+    state <- new_state
+  }
+  
+  total_infected <- sum(state == "R")
+  peak_time <- which.max(infected_count)
+  
+  return(list(total = total_infected, peak = peak_time))
+}
+
+```
+
+#### Run the simulation
+```{r}
+set.seed(42)
+res_random_blockers <- simulate_SIR_with_nonspreaders(g, beta, gamma, T_max)
+
+cat("Total infected (5% random non-spreaders): ", res_random_blockers$total, "\n")
+cat("Peak time:                                ", res_random_blockers$peak, "\n")
+
+```
+
+
+#### - Choose those 5% according to their centrality. Simulate the SIR model above βc using 1% of the remaining nodes as seeds. Choose those seeds randomly.
+
+```{r}
+simulate_SIR_with_nonspreaders_central <- function(g, beta, gamma, T_max,
+                                                    nonspreaders_frac = 0.05,
+                                                    seed_frac = 0.01,
+                                                    centrality_func = degree) {
+  N <- vcount(g)
+  nodes <- V(g)
+  
+  # Step 1: Choose top 5% by centrality as non-spreaders
+  centrality_scores <- centrality_func(g)
+  top_ids <- order(centrality_scores, decreasing = TRUE)[1:ceiling(nonspreaders_frac * N)]
+  nonspreaders <- nodes[top_ids]
+  spreaders <- setdiff(nodes, nonspreaders)
+  
+  # Step 2: Randomly select 1% of spreaders as seeds
+  seed_count <- ceiling(seed_frac * length(spreaders))
+  seeds <- sample(spreaders, seed_count)
+  
+  # Step 3: Initialize SIR states
+  state <- rep("S", N)
+  state[seeds] <- "I"
+  
+  infected_count <- numeric(T_max)
+  
+  for (t in 1:T_max) {
+    infected_count[t] <- sum(state == "I")
+    new_state <- state
+    
+    for (i in which(state == "I")) {
+      if (!(i %in% top_ids)) {
+        for (n in neighbors(g, i)) {
+          if (state[n] == "S" && runif(1) < beta) {
+            new_state[n] <- "I"
+          }
+        }
+      }
+      if (runif(1) < gamma) {
+        new_state[i] <- "R"
+      }
+    }
+    
+    if (sum(new_state == "I") == 0) {
+      infected_count[(t+1):T_max] <- 0
+      break
+    }
+    
+    state <- new_state
+  }
+  
+  total_infected <- sum(state == "R")
+  peak_time <- which.max(infected_count)
+  
+  return(list(total = total_infected, peak = peak_time))
+}
+
+```
+
+
+#### Run the simulation with degree centrality
+```{r}
+set.seed(42)
+res_central_blockers <- simulate_SIR_with_nonspreaders_central(g, beta, gamma, T_max)
+
+cat("Total infected (5% top-degree non-spreaders): ", res_central_blockers$total, "\n")
+cat("Peak time:                                    ", res_central_blockers$peak, "\n")
+
+```
+
+#### - Measure the difference between both cases as you did in step 3.
+
+```{r}
+diff_total_infected <- res_central_blockers$total - res_random_blockers$total
+cat("Difference in total infected (centrality - random):", diff_total_infected, "\n")
+
+diff_peak_time <- res_central_blockers$peak - res_random_blockers$peak
+cat("Difference in peak time (centrality - random):", diff_peak_time, "\n")
+
+```
+
+### 6. Comment on the relationship between the findings in steps 3 and 5 using the same type of centrality for the 1% in step 3 and 5% in step 5.
+
+No code required just words
+
+### 7. With the results of step 2, train a model that predicts that time to infection of a node using their degree, centrality, betweeness, page rank and any other predictors you see fit. Use that model to select the seed nodes as those with the smallest time to infection in step 3. Repeat step 5 with this knowledge.
+
+```{r}
+# Compute node features
+features_df <- data.frame(
+  node = V(g)$name,
+  degree = degree(g),
+  betweenness = betweenness(g),
+  pagerank = page_rank(g)$vector,
+  eigen = eigen_centrality(g)$vector
+)
+
+# From Step 2: capture infection times
+# Update the simulation function from earlier to store per-node infection time:
+
+simulate_SIR_with_infection_time <- function(g, beta, gamma, T_max, seeds) {
+  N <- vcount(g)
+  state <- rep("S", N)
+  infection_time <- rep(NA, N)
+  state[seeds] <- "I"
+  infection_time[seeds] <- 0
+  
+  for (t in 1:T_max) {
+    new_state <- state
+    for (i in which(state == "I")) {
+      for (n in neighbors(g, i)) {
+        if (state[n] == "S" && runif(1) < beta) {
+          new_state[n] <- "I"
+          infection_time[n] <- t
+        }
+      }
+      if (runif(1) < gamma) {
+        new_state[i] <- "R"
+      }
+    }
+    if (sum(new_state == "I") == 0) break
+    state <- new_state
+  }
+  
+  return(infection_time)
+}
+
+# Simulate and train model
+set.seed(42)
+seed_count <- ceiling(0.01 * vcount(g))
+seeds <- sample(V(g), seed_count)
+inf_time <- simulate_SIR_with_infection_time(g, beta, gamma, T_max, seeds)
+
+# Add target variable to features
+features_df$inf_time <- inf_time
+df_model <- na.omit(features_df)  # drop nodes never infected
+
+# Train model
+model <- lm(inf_time ~ degree + betweenness + pagerank + eigen, data = df_model)
+summary(model)
+
+# Predict infection time for all nodes
+features_df$predicted_time <- predict(model, newdata = features_df)
+
+# Use predicted time:
+# Step 3 redo: top 1% with smallest predicted infection time as seeds
+
+# Step 5 redo: top 5% with smallest predicted infection time as blockers
+
+# Seeding set:
+seeding_nodes <- V(g)[order(features_df$predicted_time)][1:seed_count]
+
+# Blocking set:
+block_count <- ceiling(0.05 * vcount(g))
+blocking_nodes <- V(g)[order(features_df$predicted_time)][1:block_count]
+
+```
+
+## Conclusion
+
+some words about the conclusion
+
+## References
