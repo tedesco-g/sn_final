@@ -7,7 +7,7 @@ editor: visual
 
 ## Introduction
 
-Some introduction words
+This assignment explores the dynamics of disease spread using the SIR model on a network. We simulate infection scenarios while varying the selection of seed nodes and blockers based on centrality and predicted infection times. The aim is to understand how network structure and node importance influence the spread and peak of infections. We also train a predictive model to inform strategic node selection at the end.
 
 ## Dataset Handling
 
