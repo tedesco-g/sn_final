@@ -129,9 +129,12 @@ cat("Theoretical epidemic threshold (Bc):", beta_c, "\n")
 
 # parameters
 gamma <- 1     # recovery rate 
-beta_values <- seq(0.2 * beta_c, 2 * beta_c, length.out = 10)  # the range for threshold values
-initial_frac <- 0.01  # 1% seed nodes as asked. means that %1 will get infected
-T_max <- 20           # for the duration of the simulation
+beta_values <- seq(0.2 * beta_c, 2 * beta_c, length.out = 10) 
+# the range for threshold values
+initial_frac <- 0.01  
+# 1% seed nodes as asked. means that %1 will get infected
+T_max <- 20           
+# for the duration of the simulation
 
 # SIR simulation function
 simulate_SIR <- function(g, beta, gamma, initial_frac, T_max) {
@@ -153,7 +156,8 @@ simulate_SIR <- function(g, beta, gamma, initial_frac, T_max) {
     for (i in which(state == "I")) {
       neighbors_i <- neighbors(g, i)
       susceptible_neighbors <- neighbors_i[state[neighbors_i] == "S"]
-      infected_neighbors <- susceptible_neighbors[runif(length(susceptible_neighbors)) < beta]
+      infected_neighbors <-
+        susceptible_neighbors[runif(length(susceptible_neighbors)) < beta]
       new_infected <- c(new_infected, infected_neighbors)
       
       if (runif(1) < gamma) {
@@ -177,7 +181,8 @@ simulate_SIR <- function(g, beta, gamma, initial_frac, T_max) {
 set.seed(42)
 results <- data.frame(
   beta = beta_values,
-  infected = sapply(beta_values, function(b) simulate_SIR(g, b, gamma, initial_frac, T_max))
+  infected = sapply(beta_values, 
+                    function(b) simulate_SIR(g, b, gamma, initial_frac, T_max))
 )
 
 # plot 
@@ -233,7 +238,8 @@ simulate_SIR_with_seeds <- function(g, beta, gamma, T_max, seeds) {
     for (i in which(state == "I")) {
       neighbors_i <- neighbors(g, i)
       susceptible_neighbors <- neighbors_i[state[neighbors_i] == "S"]
-      infected_neighbors <- susceptible_neighbors[runif(length(susceptible_neighbors)) < beta]
+      infected_neighbors <-
+        susceptible_neighbors[runif(length(susceptible_neighbors)) < beta]
       new_infected <- c(new_infected, infected_neighbors)
       
       if (runif(1) < gamma) {
@@ -291,7 +297,8 @@ simulate_SIR_with_peak <- function(g, beta, gamma, T_max, seeds) {
     for (i in which(state == "I")) {
       neighbors_i <- neighbors(g, i)
       susceptible_neighbors <- neighbors_i[state[neighbors_i] == "S"]
-      infected_neighbors <- susceptible_neighbors[runif(length(susceptible_neighbors)) < beta]
+      infected_neighbors <-
+        susceptible_neighbors[runif(length(susceptible_neighbors)) < beta]
       new_infected <- c(new_infected, infected_neighbors)
       
       if (runif(1) < gamma) {
@@ -373,7 +380,8 @@ simulate_SIR_with_quarantine <- function(g, beta, gamma, T_max, seeds,
     for (i in which(state == "I")) {
       neighbors_i <- neighbors(g, i)
       susceptible_neighbors <- neighbors_i[state[neighbors_i] == "S"]
-      infected_neighbors <- susceptible_neighbors[runif(length(susceptible_neighbors)) < beta]
+      infected_neighbors <-
+        susceptible_neighbors[runif(length(susceptible_neighbors)) < beta]
       new_infected <- c(new_infected, infected_neighbors)
       
       if (runif(1) < gamma) {
@@ -411,11 +419,14 @@ set.seed(42)
 random_seeds <- sample(V(g), seed_count)
 
 # no quarantine - simulation
-res_no_q <- simulate_SIR_with_quarantine(g, beta, gamma, T_max, random_seeds,
-                                         quarantine_time = 100, release_delay = 0, quarantine_frac = 0)
+res_no_q <- 
+  simulate_SIR_with_quarantine(g, beta, gamma, T_max, random_seeds, 
+                               quarantine_time = 100, release_delay = 0,
+                               quarantine_frac = 0)
 
 # scenario with quarantine starting at t = 3, 20% quarantined, released after 3 steps
-res_q <- simulate_SIR_with_quarantine(g, beta, gamma, T_max, random_seeds,
+res_q <- 
+  simulate_SIR_with_quarantine(g, beta, gamma, T_max, random_seeds,
                                       quarantine_time = 3, release_delay = 3, quarantine_frac = 0.20)
 
 # results
@@ -432,7 +443,9 @@ cat("Difference in infections:         ", res_q$total - res_no_q$total, "\n")
 Here we randomly select 5% of nodes as non-spreaders who can get infected but won’t infect others either. The function then seeds the infection only among the remaining spreaders and runs the SIR simulation accordingly. This tracks total infections and peak infection time, showing how having non-spreaders mightt affect the epidemic.
 
 ```{r}
-simulate_SIR_with_nonspreaders <- function(g, beta, gamma, T_max, nonspreaders_frac = 0.05, seed_frac = 0.01) {
+simulate_SIR_with_nonspreaders <- 
+  function(g, beta, gamma, T_max, 
+           nonspreaders_frac = 0.05, seed_frac = 0.01) {
   N <- vcount(g)
   nodes <- V(g)
   
@@ -516,7 +529,9 @@ simulate_SIR_with_nonspreaders_central <- function(g, beta, gamma, T_max,
   
   # choose top 5% by centrality as non-spreaders
   centrality_scores <- centrality_func(g)
-  top_ids <- order(centrality_scores, decreasing = TRUE)[1:ceiling(nonspreaders_frac * N)]
+  top_ids <- 
+    order(centrality_scores, 
+          decreasing = TRUE)[1:ceiling(nonspreaders_frac * N)]
   nonspreaders <- nodes[top_ids]
   spreaders <- setdiff(nodes, nonspreaders)
   
@@ -539,7 +554,8 @@ simulate_SIR_with_nonspreaders_central <- function(g, beta, gamma, T_max,
       if (!(i %in% top_ids)) {
         neighbors_i <- neighbors(g, i)
         susceptible_neighbors <- neighbors_i[state[neighbors_i] == "S"]
-        infected_neighbors <- susceptible_neighbors[runif(length(susceptible_neighbors)) < beta]
+        infected_neighbors <- 
+          susceptible_neighbors[runif(length(susceptible_neighbors)) < beta]
         new_infected <- c(new_infected, infected_neighbors)
       }
       if (runif(1) < gamma) {
@@ -754,7 +770,8 @@ block_count <- ceiling(0.05 * vcount(g))
 blocking_nodes_model <- V(g)[order(features_df$predicted_time)][1:block_count]
 
 # wrapping the original simulate_SIR_with_nonspreaders function to accept a manual set
-simulate_SIR_with_specified_blockers <- function(g, beta, gamma, T_max, blocking_nodes, seed_frac = 0.01) {
+simulate_SIR_with_specified_blockers <- function(g, beta, gamma, T_max, 
+                                                 blocking_nodes, seed_frac = 0.01) {
   N <- vcount(g)
   spreaders <- setdiff(V(g), blocking_nodes)
   
@@ -775,7 +792,8 @@ simulate_SIR_with_specified_blockers <- function(g, beta, gamma, T_max, blocking
       if (!(i %in% blocking_nodes)) {
         neighbors_i <- neighbors(g, i)
         susceptible_neighbors <- neighbors_i[state[neighbors_i] == "S"]
-        infected_neighbors <- susceptible_neighbors[runif(length(susceptible_neighbors)) < beta]
+        infected_neighbors <-
+          susceptible_neighbors[runif(length(susceptible_neighbors)) < beta]
         new_infected <- c(new_infected, infected_neighbors)
       }
       if (runif(1) < gamma) {
