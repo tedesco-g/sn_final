@@ -7,7 +7,7 @@ editor: visual
 
 ## Introduction
 
-This assignment explores the dynamics of disease spread using the SIR model on a network. We simulate infection scenarios while varying the selection of seed nodes and blockers based on centrality and predicted infection times. The aim is to understand how network structure and node importance influence the spread and peak of infections. We also train a predictive model to inform strategic node selection at the end.
+This assignment explores the dynamics of information/disease spread using the SIR model on the Marvel characters and comic books network. We simulate infection scenarios while varying the selection of seed nodes and blockers based on centrality and predicted infection times. The aim is to understand how network structure and node importance influence the spread and peak of infections. We also train a predictive model to inform strategic node selection at the end.
 
 ## Dataset Handling
 
@@ -109,7 +109,7 @@ cat("Theoretical epidemic threshold (Bc):", beta_c, "\n")
 
 ### 2. Assuming that randomly-selected 1% initial spreaders, simulate the SIR model below and above that threshold and plot the number of infected people as a function of *B*.
 
-In the code chunk below, we calculate the theoretical epidemic threshold (Bc ≈ 0.0145), which helps us identify the tipping point at which information begins to spread widely across a network rather than dying out. This threshold reflects how infectious a rumor (or disease) needs to be in order to turn into an epidemic under the network’s structure.
+In the code chunk below, we calculate the theoretical epidemic threshold (Bc = 0.0145), which helps us identify the tipping point at which information begins to spread widely across a network rather than dying out. This threshold reflects how infectious a rumor (or disease) needs to be in order to turn into an epidemic under the network’s structure.
 
 We simulate 10 different spreading rates (B values), ranging from well below the threshold (0.2 × Bc) to well above it (2 × Bc). These simulations allow us to observe how the network responds to increasing infection rates.
 
@@ -201,7 +201,7 @@ legend("bottomright", legend = c("Bc threshold"), col = "blue", lty = 2)
 
 #### a) The difference in the total number of infected people
 
-The infection rate used in this simulation is twice the epidemic threshold (B = 0.0289), meaning a large-scale outbreak is VERY likely. When the spread began with randomly selected nodes, approximately 1.527 characters were infected. However, when we seeded the spread using the most connected (highest-degree) nodes, the total number of infected individuals increased to 1.760.
+The infection rate used in this simulation is twice the epidemic threshold (B = 0.0289), meaning a large-scale outbreak is VERY likely. When the spread began with randomly selected nodes, 1.527 characters were infected. However, when we seeded the spread using the most connected (highest-degree) nodes, the total number of infected individuals increased to 1.760.
 
 This outcome confirms that targeting highly central nodes leads to a more effective spread. The difference of 233 additional infections demonstrates the importance of node centrality in maximizing diffusion across the network.
 
@@ -331,9 +331,11 @@ cat("Difference in peak time:        ", res_centrality$peak - res_random$peak, "
 
 ```
 
-### 4. Using the same *B*, design a “quarantine strategy”: at time step *t* = 3 or 4 , quarantine 20% of the susceptible population. You can model quarantine by temporally removing these nodes. Release the quarantined nodes time steps later, making them susceptible again. Measure the difference with respect to no quarantine.
+### 4. Using the same *B*, design a “quarantine strategy”: at time step *t* = 3 or 4 , quarantine 20% of the susceptible population. You can model quarantine by temporally removing these nodes. Release the quarantined nodes some time steps later, making them susceptible again. Measure the difference with respect to no quarantine.
 
-As asked, we define a function that simulates the spread of an epidemic while introducing a quarantine. At a chosen time step (we pick 3), it temporarily removes 20% of the healthy population by marking them as quarantined so they can’t get infected. After a delay of 3 steps, we put them back into the simulation as susceptible nodes again. We track how the infection spreads and returns the total number infected and the time the infection peaked.
+As asked, we defined a function that simulates the spread of an epidemic while introducing a quarantine. At a chosen time step (we pick 3), the simulation temporarily removes 20% of the healthy population by marking them as quarantined so they can’t get infected. 
+
+After a delay of 3 steps, we put them back into the simulation as susceptible nodes again. We track how the infection spreads and returns the total number infected and the time the infection peaked.
 
 ```{r}
 simulate_SIR_with_quarantine <- function(g, beta, gamma, T_max, seeds,
@@ -568,7 +570,7 @@ simulate_SIR_with_nonspreaders_central <- function(g, beta, gamma, T_max,
 
 We finally run the SIR simulation where the top 5% most connected nodes are non-spreaders as explained earlier, so they don’t transmit infection. The infection starts from 1% of the other nodes.
 
-The result shows a very low total infected count (221) and an early peak at time 1, meaning blocking highly connected nodes drastically limits the spread and the spreading peaks almost immediately with few infections. This has good implications for epidemics!
+The result shows a very low total infected count with a value of 221 and an early peak at time 1, meaning blocking highly connected nodes drastically limits the spread and the spreading peaks almost immediately with few infections. This has good implications for epidemics!
 
 ```{r}
 set.seed(42)
